@@ -37,6 +37,12 @@
             -webkit-overflow-scrolling: touch;
             height: calc(100dvh - 90px);
             scrollbar-width: none;
+            cursor: grab;
+        }
+
+        .slider.dragging {
+            cursor: grabbing;
+            scroll-snap-type: none;
         }
 
         .slider::-webkit-scrollbar {
@@ -52,6 +58,7 @@
             padding: 16px 20px;
             transition: all var(--transition);
             will-change: transform, opacity, filter;
+            user-select: none;
         }
 
         .slide.active {
@@ -88,6 +95,54 @@
             transform-origin: center;
             transition: transform 0.2s ease;
             will-change: transform;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        /* ===== ARROW BUTTONS FOR PC ===== */
+        .arrow-btn {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.3);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.25s ease;
+            z-index: 999;
+            backdrop-filter: blur(10px);
+        }
+
+        .arrow-btn:hover {
+            background: rgba(0, 0, 0, 0.5);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .arrow-btn:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        .arrow-btn.left {
+            left: 50%;
+            margin-left: -320px;
+        }
+
+        .arrow-btn.right {
+            right: 50%;
+            margin-right: -320px;
+        }
+
+        @media (min-width: 768px) {
+            .arrow-btn {
+                display: flex;
+            }
         }
 
         /* ===== PROGRESS BAR ===== */
@@ -261,6 +316,13 @@
         </div>
     </div>
 
+    <button class="arrow-btn left" id="prevBtn" aria-label="Previous slide">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+    <button class="arrow-btn right" id="nextBtn" aria-label="Next slide">
+        <i class="fas fa-chevron-right"></i>
+    </button>
+
     <div class="dots" id="dots"></div>
 
     <div class="btn-group">
@@ -288,8 +350,11 @@
 
         let scrollTimeout;
         let touchStartX = 0;
+        let isScrolling = false;
+        let mouseDown = false;
+        let startScrollLeft = 0;
 
-        const AUTOPLAY_THRESHOLD = 50;
+        const SWIPE_THRESHOLD = 30;
 
         /* ===== HELPER FUNCTIONS ===== */
         function getDist(touches) {
@@ -348,21 +413,88 @@
         /* ===== SCROLL HANDLER WITH SNAP ===== */
         slider.addEventListener("scroll", () => {
             updateActive();
+            
+            // Don't snap while dragging
+            if (mouseDown) return;
+            
             clearTimeout(scrollTimeout);
 
             scrollTimeout = setTimeout(() => {
-                const index = Math.round(slider.scrollLeft / slider.clientWidth);
-                slider.scrollTo({
-                    left: index * slider.clientWidth,
-                    behavior: "smooth"
-                });
-            }, 80);
+                // Skip snap if still dragging
+                if (mouseDown) return;
+                
+                const scrollLeft = slider.scrollLeft;
+                const slideWidth = slider.clientWidth;
+                const index = Math.round(scrollLeft / slideWidth);
+                const targetScroll = index * slideWidth;
+                
+                // Only snap if off by more than 10px
+                if (Math.abs(scrollLeft - targetScroll) > 10) {
+                    slider.scrollTo({
+                        left: targetScroll,
+                        behavior: "smooth"
+                    });
+                }
+            }, 200);
         }, { passive: true });
 
         /* ===== KEYBOARD NAVIGATION ===== */
         document.addEventListener("keydown", (e) => {
             if (e.key === "ArrowLeft") prevSlide();
             if (e.key === "ArrowRight") nextSlide();
+        });
+
+        /* ===== ARROW BUTTON NAVIGATION ===== */
+        const prevBtn = document.getElementById("prevBtn");
+        const nextBtn = document.getElementById("nextBtn");
+        if (prevBtn) prevBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            prevSlide();
+        });
+        if (nextBtn) nextBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            nextSlide();
+        });
+
+        /* ===== MOUSE DRAG FOR PC ===== */
+        slider.addEventListener("mousedown", (e) => {
+            mouseDown = true;
+            startScrollLeft = slider.scrollLeft;
+            const startX = e.clientX;
+            
+            slider.classList.add("dragging");
+            slider.style.scrollBehavior = "auto";
+
+            const onMouseMove = (moveEvent) => {
+                if (!mouseDown) return;
+                moveEvent.preventDefault();
+                const diff = (startX - moveEvent.clientX) * 0.2;
+                slider.scrollLeft = startScrollLeft + diff;
+            };
+
+            const onMouseUp = () => {
+                mouseDown = false;
+                slider.classList.remove("dragging");
+                slider.style.scrollBehavior = "smooth";
+                document.removeEventListener("mousemove", onMouseMove);
+                document.removeEventListener("mouseup", onMouseUp);
+                
+                // Calculate which slide is closest
+                const slideWidth = slider.clientWidth;
+                const currentScroll = slider.scrollLeft;
+                const index = Math.round(currentScroll / slideWidth);
+                const targetScroll = index * slideWidth;
+                
+                // Only snap if significantly off-center
+                if (Math.abs(currentScroll - targetScroll) > slideWidth * 0.05) {
+                    slider.scrollLeft = targetScroll;
+                }
+            };
+
+            document.addEventListener("mousemove", onMouseMove);
+            document.addEventListener("mouseup", onMouseUp);
         });
 
         /* ===== IMAGE TOUCH INTERACTIONS ===== */
@@ -375,6 +507,7 @@
 
             img.addEventListener("touchstart", e => {
                 touchStartX = e.touches[0].clientX;
+                isScrolling = false;
                 
                 if (e.touches.length === 2) {
                     startDist = getDist(e.touches);
@@ -402,15 +535,17 @@
             img.addEventListener("touchend", (e) => {
                 isDragging = false;
                 
-                // Swipe detection
+                // Swipe detection - only trigger if significant movement and not scrolling
                 const touchEndX = e.changedTouches[0].clientX;
                 const diff = touchStartX - touchEndX;
                 
-                if (Math.abs(diff) > AUTOPLAY_THRESHOLD && scale === 1) {
-                    if (diff > 0) {
-                        nextSlide();
-                    } else {
-                        prevSlide();
+                if (Math.abs(diff) > SWIPE_THRESHOLD && scale === 1 && !isScrolling) {
+                    if (Math.abs(diff) < slider.clientWidth / 2) {
+                        if (diff > 0) {
+                            nextSlide();
+                        } else {
+                            prevSlide();
+                        }
                     }
                 }
                 
