@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cơm Nhà Phan Thiết</title>
+
+    <style>
+        body {
+            margin: 0;
+            background: #d8cfc3;
+            font-family: sans-serif;
+            overflow: hidden;
+            /* 🔥 tránh bounce */
+        }
+
+        /* ===== SLIDER ===== */
+        .slider {
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            height: calc(100dvh - 90px);
+        }
+
+        .slide {
+            min-width: 100%;
+            display: flex;
+            justify-content: center;
+
+            /* 👇 mặc định mobile thấp */
+            align-items: flex-start;
+
+            scroll-snap-align: start;
+            padding: 16px 0;
+        }
+
+        @media (min-height: 800px) {
+            .slide {
+                align-items: center;
+                /* 🔥 auto căn giữa nếu màn cao */
+            }
+        }
+
+        /* 🔥 WRAP để fix center chuẩn */
+        .img-wrap {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* ảnh */
+        .img-wrap img {
+            width: 100%;
+            height: auto;
+            max-height: calc(100dvh - 120px);
+            object-fit: contain;
+
+            border-radius: 16px;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+
+            transform-origin: center center;
+            transition: transform 0.2s ease;
+        }
+
+        /* ===== INDICATOR ===== */
+        .indicator {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+
+        /* ===== BUTTON ===== */
+        .btn-group {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+
+            display: flex;
+            gap: 8px;
+            padding: 10px;
+
+            background: rgba(216, 207, 195, 0.7);
+            backdrop-filter: blur(10px);
+
+            max-width: 600px;
+            margin: 0 auto;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .btn {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-decoration: none;
+            color: white;
+        }
+
+        .zalo {
+            background: #0068ff;
+        }
+
+        .wa {
+            background: #25D366;
+        }
+
+        .call {
+            background: #444;
+        }
+
+        .slider::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="slider" id="slider">
+        <div class="slide">
+            <div class="img-wrap"><img src="menu-1.webp"></div>
+        </div>
+        <div class="slide">
+            <div class="img-wrap"><img src="menu-2.webp"></div>
+        </div>
+        <div class="slide">
+            <div class="img-wrap"><img src="menu-3.webp"></div>
+        </div>
+        <div class="slide">
+            <div class="img-wrap"><img src="menu-4.webp"></div>
+        </div>
+        <div class="slide">
+            <div class="img-wrap"><img src="menu-5.webp"></div>
+        </div>
+    </div>
+
+    <div class="indicator" id="indicator">1 / 5</div>
+
+    <div class="btn-group">
+        <a class="btn zalo" href="https://zalo.me/0866461221">Zalo</a>
+        <a class="btn wa" href="https://wa.me/84866461221">WhatsApp</a>
+        <a class="btn call" href="tel:+84866461221">Call</a>
+    </div>
+
+    <script>
+        const slider = document.getElementById("slider");
+        const indicator = document.getElementById("indicator");
+        const slides = document.querySelectorAll(".slide");
+        const total = slides.length;
+
+        /* ===== INDICATOR ===== */
+        slider.addEventListener("scroll", () => {
+            const index = Math.round(slider.scrollLeft / slider.clientWidth);
+            indicator.innerText = (index + 1) + " / " + total;
+        });
+
+        /* ===== PINCH ZOOM + DRAG ===== */
+        document.querySelectorAll("img").forEach(img => {
+            let scale = 1;
+            let posX = 0, posY = 0;
+            let startX = 0, startY = 0;
+            let isDragging = false;
+
+            img.addEventListener("touchstart", e => {
+                if (e.touches.length === 2) {
+                    startDist = getDist(e.touches);
+                } else if (e.touches.length === 1 && scale > 1) {
+                    isDragging = true;
+                    startX = e.touches[0].clientX - posX;
+                    startY = e.touches[0].clientY - posY;
+                }
+            });
+
+            img.addEventListener("touchmove", e => {
+                if (e.touches.length === 2) {
+                    let newDist = getDist(e.touches);
+                    scale *= newDist / startDist;
+                    scale = Math.min(Math.max(scale, 1), 3);
+                    startDist = newDist;
+                } else if (isDragging) {
+                    posX = e.touches[0].clientX - startX;
+                    posY = e.touches[0].clientY - startY;
+                }
+
+                img.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+            });
+
+            img.addEventListener("touchend", () => {
+                isDragging = false;
+                if (scale === 1) {
+                    posX = 0;
+                    posY = 0;
+                    img.style.transform = `scale(1)`;
+                }
+            });
+
+            img.addEventListener("dblclick", () => {
+                scale = scale === 1 ? 2 : 1;
+                posX = posY = 0;
+                img.style.transform = `scale(${scale})`;
+            });
+
+            function getDist(touches) {
+                let dx = touches[0].clientX - touches[1].clientX;
+                let dy = touches[0].clientY - touches[1].clientY;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+        });
+    </script>
+
+</body>
+
+</html>
