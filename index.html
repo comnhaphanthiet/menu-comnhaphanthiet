@@ -12,6 +12,7 @@
             --shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
             --transition: 0.3s ease;
             --radius: 8px;
+            --primary: #0068ff;
         }
 
         * {
@@ -48,17 +49,15 @@
             align-items: flex-start;
             scroll-snap-align: start;
             padding: 16px 20px;
-            transform: scale(0.9);
-            opacity: 0.5;
-            filter: blur(1px);
             transition: all var(--transition);
             will-change: transform, opacity, filter;
         }
 
         .slide.active {
-            transform: scale(1);
-            opacity: 1;
-            filter: blur(0);
+            z-index: 10;
+        }
+
+        .slide:nth-child(2n) {
         }
 
         @media (min-height: 800px) {
@@ -75,6 +74,7 @@
             justify-content: center;
             overflow: hidden;
             border-radius: 16px;
+            position: relative;
         }
 
         .img-wrap img {
@@ -89,6 +89,22 @@
             will-change: transform;
         }
 
+        /* ===== PROGRESS BAR ===== */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), #FF6B9D);
+            width: 0%;
+            z-index: 100;
+            animation: progress 0.1s ease;
+        }
+
+        @keyframes progress {
+            0% { width: 0%; }
+        }
+
         /* ===== DOTS ===== */
         .dots {
             position: fixed;
@@ -96,21 +112,29 @@
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 6px;
+            gap: 8px;
             z-index: 1;
         }
 
         .dot {
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.2);
             cursor: pointer;
-            transition: background 0.2s ease;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .dot:hover {
+            background: rgba(0, 0, 0, 0.4);
+            transform: scale(1.1);
         }
 
         .dot.active {
             background: #000;
+            width: 24px;
+            border-radius: 50%;
         }
 
         /* ===== BUTTON ===== */
@@ -162,20 +186,21 @@
 <body>
 
     <div class="slider" id="slider">
+        <div class="progress-bar" id="progressBar"></div>
         <div class="slide">
-            <div class="img-wrap"><img src="menu-1.webp"></div>
+            <div class="img-wrap"><img src="menu-1.webp" alt="Menu 1"></div>
         </div>
         <div class="slide">
-            <div class="img-wrap"><img src="menu-2.webp"></div>
+            <div class="img-wrap"><img src="menu-2.webp" alt="Menu 2"></div>
         </div>
         <div class="slide">
-            <div class="img-wrap"><img src="menu-3.webp"></div>
+            <div class="img-wrap"><img src="menu-3.webp" alt="Menu 3"></div>
         </div>
         <div class="slide">
-            <div class="img-wrap"><img src="menu-4.webp"></div>
+            <div class="img-wrap"><img src="menu-4.webp" alt="Menu 4"></div>
         </div>
         <div class="slide">
-            <div class="img-wrap"><img src="menu-5.webp"></div>
+            <div class="img-wrap"><img src="menu-5.webp" alt="Menu 5"></div>
         </div>
     </div>
 
@@ -192,9 +217,13 @@
         const slides = document.querySelectorAll(".slide");
         const images = document.querySelectorAll("img");
         const dotsContainer = document.getElementById("dots");
+        const progressBar = document.getElementById("progressBar");
         const total = slides.length;
 
         let scrollTimeout;
+        let touchStartX = 0;
+
+        const AUTOPLAY_THRESHOLD = 50;
 
         /* ===== HELPER FUNCTIONS ===== */
         function getDist(touches) {
@@ -205,13 +234,40 @@
 
         function updateActive() {
             const index = Math.round(slider.scrollLeft / slider.clientWidth);
-
+            
             slides.forEach(s => s.classList.remove("active"));
             if (slides[index]) slides[index].classList.add("active");
 
             const dots = dotsContainer.querySelectorAll(".dot");
             dots.forEach(d => d.classList.remove("active"));
             if (dots[index]) dots[index].classList.add("active");
+
+            updateProgressBar(index);
+        }
+
+        function updateProgressBar(index) {
+            const progress = ((index + 1) / total) * 100;
+            progressBar.style.width = progress + "%";
+        }
+
+        function goToSlide(index) {
+            const position = index * slider.clientWidth;
+            slider.scrollTo({
+                left: position,
+                behavior: "smooth"
+            });
+        }
+
+        function nextSlide() {
+            const index = Math.round(slider.scrollLeft / slider.clientWidth);
+            const nextIndex = (index + 1) % total;
+            goToSlide(nextIndex);
+        }
+
+        function prevSlide() {
+            const index = Math.round(slider.scrollLeft / slider.clientWidth);
+            const prevIndex = (index - 1 + total) % total;
+            goToSlide(prevIndex);
         }
 
         /* ===== CREATE DOTS ===== */
@@ -219,6 +275,7 @@
             const dot = document.createElement("div");
             dot.classList.add("dot");
             if (i === 0) dot.classList.add("active");
+            dot.addEventListener("click", () => goToSlide(i));
             dotsContainer.appendChild(dot);
         }
 
@@ -236,6 +293,12 @@
             }, 80);
         }, { passive: true });
 
+        /* ===== KEYBOARD NAVIGATION ===== */
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowLeft") prevSlide();
+            if (e.key === "ArrowRight") nextSlide();
+        });
+
         /* ===== IMAGE TOUCH INTERACTIONS ===== */
         images.forEach(img => {
             let scale = 1;
@@ -245,6 +308,8 @@
             let isDragging = false;
 
             img.addEventListener("touchstart", e => {
+                touchStartX = e.touches[0].clientX;
+                
                 if (e.touches.length === 2) {
                     startDist = getDist(e.touches);
                 } else if (e.touches.length === 1 && scale > 1) {
@@ -268,8 +333,21 @@
                 img.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
             }, { passive: true });
 
-            img.addEventListener("touchend", () => {
+            img.addEventListener("touchend", (e) => {
                 isDragging = false;
+                
+                // Swipe detection
+                const touchEndX = e.changedTouches[0].clientX;
+                const diff = touchStartX - touchEndX;
+                
+                if (Math.abs(diff) > AUTOPLAY_THRESHOLD && scale === 1) {
+                    if (diff > 0) {
+                        nextSlide();
+                    } else {
+                        prevSlide();
+                    }
+                }
+                
                 if (scale === 1) {
                     posX = 0;
                     posY = 0;
