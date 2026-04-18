@@ -12,7 +12,6 @@
             background: #d8cfc3;
             font-family: sans-serif;
             overflow: hidden;
-            /* 🔥 tránh bounce */
         }
 
         /* ===== SLIDER ===== */
@@ -20,7 +19,9 @@
             display: flex;
             overflow-x: auto;
             scroll-snap-type: x mandatory;
+            scroll-snap-stop: always;
             -webkit-overflow-scrolling: touch;
+
             height: calc(100dvh - 90px);
         }
 
@@ -28,22 +29,30 @@
             min-width: 100%;
             display: flex;
             justify-content: center;
-
-            /* 👇 mặc định mobile thấp */
             align-items: flex-start;
-
             scroll-snap-align: start;
-            padding: 16px 0;
+            padding: 16px 20px;
+
+            /* 🔥 EFFECT */
+            transform: scale(0.9);
+            opacity: 0.5;
+            filter: blur(1px);
+            transition: all 0.3s ease;
+        }
+
+        .slide.active {
+            transform: scale(1);
+            opacity: 1;
+            filter: blur(0);
         }
 
         @media (min-height: 800px) {
             .slide {
                 align-items: center;
-                /* 🔥 auto căn giữa nếu màn cao */
             }
         }
 
-        /* 🔥 WRAP để fix center chuẩn */
+        /* IMAGE */
         .img-wrap {
             width: 100%;
             max-width: 600px;
@@ -52,7 +61,6 @@
             overflow: hidden;
         }
 
-        /* ảnh */
         .img-wrap img {
             width: 100%;
             height: auto;
@@ -62,21 +70,29 @@
             border-radius: 16px;
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 
-            transform-origin: center center;
+            transform-origin: center;
             transition: transform 0.2s ease;
         }
 
-        /* ===== INDICATOR ===== */
-        .indicator {
+        /* ===== DOTS ===== */
+        .dots {
             position: fixed;
-            bottom: 90px;
+            bottom: 95px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.5);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 13px;
+            display: flex;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .dot.active {
+            background: #000;
         }
 
         /* ===== BUTTON ===== */
@@ -146,7 +162,7 @@
         </div>
     </div>
 
-    <div class="indicator" id="indicator">1 / 5</div>
+    <div class="dots" id="dots"></div>
 
     <div class="btn-group">
         <a class="btn zalo" href="https://zalo.me/0866461221">Zalo</a>
@@ -156,21 +172,55 @@
 
     <script>
         const slider = document.getElementById("slider");
-        const indicator = document.getElementById("indicator");
         const slides = document.querySelectorAll(".slide");
         const total = slides.length;
 
-        /* ===== INDICATOR ===== */
-        slider.addEventListener("scroll", () => {
+        /* ===== DOTS ===== */
+        const dotsContainer = document.getElementById("dots");
+
+        for (let i = 0; i < total; i++) {
+            const dot = document.createElement("div");
+            dot.classList.add("dot");
+            if (i === 0) dot.classList.add("active");
+            dotsContainer.appendChild(dot);
+        }
+
+        const dots = document.querySelectorAll(".dot");
+
+        /* ===== UPDATE ACTIVE ===== */
+        function updateActive() {
             const index = Math.round(slider.scrollLeft / slider.clientWidth);
-            indicator.innerText = (index + 1) + " / " + total;
+
+            slides.forEach(s => s.classList.remove("active"));
+            if (slides[index]) slides[index].classList.add("active");
+
+            dots.forEach(d => d.classList.remove("active"));
+            if (dots[index]) dots[index].classList.add("active");
+        }
+
+        /* ===== SNAP + EFFECT ===== */
+        let timeout;
+        slider.addEventListener("scroll", () => {
+            updateActive();
+
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                const index = Math.round(slider.scrollLeft / slider.clientWidth);
+                slider.scrollTo({
+                    left: index * slider.clientWidth,
+                    behavior: "smooth"
+                });
+            }, 80);
         });
+
+        window.onload = updateActive;
 
         /* ===== PINCH ZOOM + DRAG ===== */
         document.querySelectorAll("img").forEach(img => {
             let scale = 1;
             let posX = 0, posY = 0;
             let startX = 0, startY = 0;
+            let startDist = 0;
             let isDragging = false;
 
             img.addEventListener("touchstart", e => {
