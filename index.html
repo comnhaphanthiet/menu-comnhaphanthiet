@@ -199,19 +199,7 @@
         }
 
         /* ===== SNAP + EFFECT ===== */
-        let timeout;
-        slider.addEventListener("scroll", () => {
-            updateActive();
-
-            clearTimeout(timeout);
-            timeout = setTimeout(() => {
-                const index = Math.round(slider.scrollLeft / slider.clientWidth);
-                slider.scrollTo({
-                    left: index * slider.clientWidth,
-                    behavior: "smooth"
-                });
-            }, 80);
-        });
+        slider.addEventListener("scroll", updateActive);
 
         window.onload = updateActive;
 
